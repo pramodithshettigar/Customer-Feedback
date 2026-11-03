@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 25px 15px;
+      font-family: Arial, sans-serif;
+      background: #f0f5f2;
+      color: #26352c;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 28px;
+      border-radius: 15px;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .header h2 {
+      color: #16834a;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: #64746a;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 7px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ccd8cf;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #16834a;
+    }
+
+    .upload {
+      padding: 15px;
+      background: #f5faf6;
+      border: 2px dashed #9bbba5;
+      border-radius: 8px;
+    }
+
+    .hint {
+      color: #68776c;
+      font-size: 12px;
+      margin-top: 7px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 23px;
+      border: none;
+      border-radius: 8px;
+      background: #16834a;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #8baf98;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 7px;
+      display: none;
+      overflow-wrap: anywhere;
+    }
+
+    .success {
+      background: #e3f5e8;
+      color: #176b35;
+    }
+
+    .error {
+      background: #ffe8e8;
+      color: #a12626;
+    }
+
+    @media(max-width:480px) {
+      .container {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h2>🌿 Customer Feedback</h2>
+    <p>Help us identify and report pollution in your area.</p>
+  </div>
+
+  <form id="feedbackForm">
+
+    <label for="name">Customer Name *</label>
+    <input
+      type="text"
+      id="name"
+      placeholder="Enter your full name"
+      maxlength="100"
+      required
+    >
+
+    <label for="mobile">Mobile Number *</label>
+    <input
+      type="tel"
+      id="mobile"
+      placeholder="Enter 10-digit mobile number"
+      maxlength="10"
+      pattern="[0-9]{10}"
+      required
+    >
+
+    <label for="feedback">Pollution Feedback *</label>
+    <textarea
+      id="feedback"
+      placeholder="Describe the pollution problem, such as air pollution, water pollution, plastic waste, noise pollution..."
+      maxlength="5000"
+      required
+    ></textarea>
+
+    <label for="images">Upload Pollution Images</label>
+
+    <div class="upload">
+      <input
+        type="file"
+        id="images"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+      >
+
+      <p class="hint">
+        Upload up to 5 images. Maximum 2 MB per image.
+        Supported formats: JPG, PNG, WEBP.
+      </p>
+    </div>
+
+    <button type="submit" id="submitBtn">
+      Submit Feedback
+    </button>
+
+    <div id="status" role="status" aria-live="polite"></div>
+
+  </form>
+
+</div>
+
+<script>
+
+  const form = document.getElementById("feedbackForm");
+  const imageInput = document.getElementById("images");
+  const submitBtn = document.getElementById("submitBtn");
+  const statusBox = document.getElementById("status");
+
+  function showStatus(message, type) {
+    statusBox.style.display = "block";
+    statusBox.className = type;
+    statusBox.textContent = message;
+  }
+
+  function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const base64 = reader.result.split(",")[1];
+
+        resolve({
+          name: file.name,
+          mimeType: file.type,
+          data: base64
+        });
+      };
+
+      reader.onerror = () => reject(
+        new Error("Unable to read " + file.name)
+      );
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  form.addEventListener("submit", async function(event) {
+
+    event.preventDefault();
+
+    const files = Array.from(imageInput.files);
+
+    if (files.length > 5) {
+      showStatus("Please select a maximum of 5 images.", "error");
+      return;
+    }
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ];
+
+    for (const file of files) {
+      if (!allowedTypes.includes(file.type)) {
+        showStatus("Only JPG, PNG and WEBP images are allowed.", "error");
+        return;
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        showStatus(file.name + " exceeds the 2 MB limit.", "error");
+        return;
+      }
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting...";
+
+    showStatus("Please wait while we save your feedback...", "success");
+
+    try {
+
+      const images = await Promise.all(
+        files.map(readImage)
+      );
+
+      const data = {
+        name: document.getElementById("name").value.trim(),
+        mobile: document.getElementById("mobile").value.trim(),
+        feedback: document.getElementById("feedback").value.trim(),
+        images: images
+      };
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+
+          showStatus(
+            response.message + " Your Feedback ID: " + response.feedbackId,
+            "success"
+          );
+
+          form.reset();
+
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Submit Feedback";
+
+        })
+        .withFailureHandler(function(error) {
+
+          showStatus(
+            "Submission failed: " + error.message,
+            "error"
+          );
+
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Submit Feedback";
+
+        })
+        .submitFeedback(data);
+
+    } catch (error) {
+
+      showStatus(error.message, "error");
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Feedback";
+
+    }
+
+  });
+
+</script>
+
+</body>
+</html>
